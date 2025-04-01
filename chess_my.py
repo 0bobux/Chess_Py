@@ -151,6 +151,89 @@ class King(Piece):
                     moves.append((r, c))
         return moves
 
+class Kamikaze(Piece):
+    def __init__(self, color):
+        super().__init__(color)
+        self.symbol = '⸱K⸱' if color == 'white' else '⸱k⸱'
+
+    def get_valid_moves(self, board, start_row, start_col):
+        moves = []
+        # 1. Ход влево и вправо на одну клетку
+        for dc in [-1, 1]:
+            r, c = start_row, start_col + dc
+            if board.is_on_board(r, c):
+                piece = board.get_piece(r, c)
+                if not piece or piece.color != self.color:  # Свободная клетка или чужая фигура
+                    moves.append((r, c))
+
+        # 2. Ход вперед до конца
+        direction = -1 if self.color == 'white' else 1
+        r, c = start_row + direction, start_col
+        while board.is_on_board(r, c):
+            piece = board.get_piece(r, c)
+            if piece:  # Если встретилась фигура
+                if piece.color != self.color:  # Взорвем фигуру противника
+                    moves.append((r, c))
+                break  # Взорвемся или остановимся
+            moves.append((r, c))
+            r += direction  # Идем дальше
+
+        return moves
+
+    def explode(self, board, start_row, start_col, end_row, end_col):
+        """
+        Метод для подрыва фигуры. Уничтожает себя и фигуру противника.
+        """
+        # Проверим, существует ли фигура на клетке, на которую мы ходим.
+        if (end_row, end_col) in board.grid:
+            target_piece = board.get_piece(end_row, end_col)
+            if target_piece and target_piece.color != self.color:  # Если фигура противника
+                del board.grid[(end_row, end_col)]  # Удаляем фигуру противника
+
+        # Удаляем камикадзе с доски (он больше не будет на исходной клетке)
+        if (start_row, start_col) in board.grid:
+            del board.grid[(start_row, start_col)]  # Удаляем камикадзе с доски
+
+        # Камикадзе исчезает с доски
+        return
+
+class Commander(Piece):
+    def __init__(self, color):
+        super().__init__(color)
+        self.symbol = '⬭' if color == 'white' else '⬬'
+
+    def get_valid_moves(self, board, start_row, start_col):
+        moves = []
+        directions = [(2, 0), (-2, 0), (0, 2), (0, -2),  # Ход как ферзь на 2 клетки
+                      (2, 2), (2, -2), (-2, 2), (-2, -2)]
+        for dr, dc in directions:
+            r, c = start_row + dr, start_col + dc
+            if board.is_on_board(r, c):
+                piece = board.get_piece(r, c)
+                if not piece or piece.color != self.color:
+                    moves.append((r, c))
+
+        # Взятие на проходе (отслеживание хода противника нужно реализовать отдельно)
+        return moves
+
+class Champion(Piece):
+    def __init__(self, color):
+        super().__init__(color)
+        self.symbol = '⛉' if color == 'white' else '⛊'
+
+    def get_valid_moves(self, board, start_row, start_col):
+        moves = []
+        knight_moves = [  # Прыжки через одну клетку
+            (2, 2), (2, -2), (-2, 2), (-2, -2)
+        ]
+        for dr, dc in knight_moves:
+            r, c = start_row + dr, start_col + dc
+            if board.is_on_board(r, c):
+                piece = board.get_piece(r, c)
+                if not piece or piece.color != self.color:
+                    moves.append((r, c))
+        return moves
+
 class Board:
     def __init__(self):
         # Словарь: ключ = (row, col), значение = объект Piece или None
@@ -192,6 +275,16 @@ class Board:
         self.grid[(7, 4)] = King('white')
         self.grid[(0, 4)] = King('black')
 
+        # Добавление новых фигур
+        self.grid[(5, 0)] = Kamikaze('white')
+        self.grid[(2, 7)] = Kamikaze('black')
+
+        self.grid[(5, 3)] = Commander('white')
+        self.grid[(2, 3)] = Commander('black')
+
+        self.grid[(5, 4)] = Champion('white')
+        self.grid[(2, 4)] = Champion('black')
+
     def is_on_board(self, row, col):
         return 0 <= row < 8 and 0 <= col < 8
 
@@ -209,27 +302,42 @@ class Board:
         """
         piece = self.grid.get(start)
         if piece:
-            self.grid[end] = piece
-            del self.grid[start]
+            target = self.grid.get(end)
+            # Если ходит Камикадзе и там есть враг — он взрывается
+            if isinstance(piece, Kamikaze) and target:
+                piece.explode(self, start[0], start[1], end[0], end[1])
+            else:
+                # Обычный ход
+                self.grid[end] = piece
+                del self.grid[start]
 
-    def print_board(self):
+    def print_board(self, highlight_moves=None):
         """
         Печатает доску в консоль.
         Сверху - 8-я горизонталь (row=0), снизу - 1-я (row=7).
         Слева направо - столбцы a..h (col=0..7).
         :return:
         """
+        highlight_moves = highlight_moves or []  # Если передали None, заменяем на пустой список
+
         print("   a  b c  d  e  f g  h")
         for row in range(8):
             print(8 - row, end="  ")
             for col in range(8):
-                piece = self.get_piece(row, col)
-                if piece:
-                    print(str(piece), end=" ")
+                if (row, col) in highlight_moves:
+                    print('▬', end=" ")  # Показываем возможный ход
                 else:
-                    print('▭', end=" ")  # Пустая клетка
-            print(" ", 8 - row)
+                    piece = self.get_piece(row, col)
+                    print(str(piece) if piece else '▭', end=" ")
+            print("", 8 - row)
         print("   a  b c  d  e  f g  h")
+
+    def show_valid_moves(self, piece, row, col):
+        """
+        Отображает возможные ходы фигуры на доске.
+        """
+        valid_moves = piece.get_valid_moves(self, row, col)
+        self.print_board(highlight_moves=valid_moves)  # Отображаем доску с подсвеченными ходами
 
     def get_line_moves(self, piece, start_row, start_col, d_row, d_col):
         """
@@ -249,7 +357,7 @@ class Board:
         while self.is_on_board(r, c):
             existing_piece = self.get_piece(r, c)
             if existing_piece:
-                # Если это фигура соперника, её можно "взять" и остановиться
+                # Если это фигура соперника, её можно "съесть" и остановиться
                 if existing_piece.color != piece.color:
                     moves.append((r, c))
                 # Если своя или чужая, дальше идти нельзя
@@ -277,11 +385,20 @@ class Board:
         if piece.color != current_color:
             return False, "Фигура не принадлежит текущему игроку."
 
+        # Показываем возможные ходы
+        print(f"Возможные ходы для {piece}:")
+        self.show_valid_moves(piece, start[0], start[1])
+
         valid_positions = piece.get_valid_moves(self, start[0], start[1])
         if end not in valid_positions:
             return False, "Недопустимый ход для выбранной фигуры."
 
         return True, ""
+
+    def copy(self):
+        new_board = Board()
+        new_board.grid = self.grid.copy()  # Копируем текущие фигуры
+        return new_board
 
     @staticmethod
     def algebraic_to_coords(pos_str):
@@ -304,11 +421,24 @@ class Board:
         row = 8 - int(row_digit) # '1'->7, '8'->0
         return (row, col)
 
+class MoveHistory:
+    def __init__(self):
+        self.history = []
+
+    def add_move(self, board_state):
+        self.history.append(board_state)
+
+    def undo_move(self):
+        if self.history:
+            return self.history.pop()
+        return None
+
 class Game:
     def __init__(self):
         self.board = Board()
         self.current_player = 'white'
         self.move_count = 0
+        self.history = MoveHistory()
 
     def switch_player(self):
         self.current_player = 'black' if self.current_player == 'white' else 'white'
@@ -320,15 +450,39 @@ class Game:
             print(f"Ход номер: {self.move_count}. Сейчас ходят {self.current_player}.")
 
             # 2. Считываем начальную позицию
-            start_str = input(f"Введите позицию фигуры ({self.current_player}), например e2 (или 'exit'): ")
+            start_str = input(f"Введите позицию фигуры ({self.current_player}), например e2 (или 'exit' - для выхода из игры,\n'undo N' - для отмены N последних ходов): ")
             if start_str.lower() == 'exit':
                 print("Игра завершена.")
                 break
+            elif start_str.lower().startswith('undo'):
+                # Разбираем команду для отката нескольких ходов
+                parts = start_str.split()
+                if len(parts) == 2 and parts[1].isdigit():
+                    undo_moves = int(parts[1])
+                    success = False  # Флаг, который проверяет, был ли откат хотя бы одного хода
+                    for _ in range(undo_moves):
+                        last_state = self.history.undo_move()
+                        if last_state:
+                            self.board = last_state
+                            self.move_count -= 1
+                            self.switch_player()
+                            success = True
+                        else:
+                            print("Нет хода для отката.")
+
+                    if success:
+                        print(f"Откат на {undo_moves} ход(ов).")
+                    continue
 
             start = self.board.algebraic_to_coords(start_str)
             if not start:
                 print("Неверный формат ввода (пример: e2). Попробуйте ещё раз.")
                 continue
+
+            # Подсветка возможных ходов для выбранной фигуры
+            piece = self.board.get_piece(start[0], start[1])
+            if piece and piece.color == self.current_player:
+                self.board.show_valid_moves(piece, start[0], start[1])
 
             # 3. Считываем конечную позицию
             end_str = input("Введите целевую позицию, например e4 (или 'exit'): ")
@@ -345,6 +499,9 @@ class Game:
             if not valid:
                 print(f"Ход некорректен: {message}")
                 continue
+
+            # Сохраняем текущее состояние доски в историю перед выполнением хода
+            self.history.add_move(self.board.copy())  # предполагаем, что нужно реализовать метод copy()
 
             # 5. Если ход корректен, двигаем фигуру
             self.board.move_piece(start, end)
