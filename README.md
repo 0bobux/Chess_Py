@@ -33,7 +33,7 @@
 берется совместно с Заданием 1).
 Сложность 1
 
-![Image alt](https://github.com/{username}/{repository}/raw/{branch}/{path}/image.png)
-![Image alt](https://github.com/{username}/{repository}/raw/{branch}/{path}/image.png)
-![Image alt](https://github.com/{username}/{repository}/raw/{branch}/{path}/image.png)
-![Image alt](https://github.com/{username}/{repository}/raw/{branch}/{path}/image.png)
+![Шахматы](https://github.com/0bobux/Chess_Py/blob/master/images/chess1.png)
+![Удачный ход](https://github.com/0bobux/Chess_Py/blob/master/images/chess_good.png)
+![Плохой ход + подсказка](https://github.com/0bobux/Chess_Py/blob/master/images/chess_bad.png)
+![Шашки](https://github.com/0bobux/Chess_Py/blob/master/images/checkers.png)
